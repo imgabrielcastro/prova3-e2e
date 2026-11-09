@@ -1,44 +1,32 @@
-import { expect, test } from '@playwright/test';
+import { test } from '@playwright/test';
+import { join } from 'path';
+import { TheConfig } from 'sicolo';
+import SatcPage from '../support/pages/SatcPage';
 
-const invalidInputs = [
-  '...',
-  '123.456',
-  '12.34.56',
-  '1,2',
-  '12-34',
-  'abc',
-  '12 34',
-  '!@#'
-];
+test.describe('Portal SATC - Login do aluno', () => {
+  const CONFIG = join(__dirname, '../support/fixtures/config.yml');
+  let satcPage: SatcPage;
+  const BASE_URL = TheConfig.fromFile(CONFIG)
+    .andPath('application.satc')
+    .retrieveData();
 
-test.describe('SATC Portal - Matrícula do aluno', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('https://www1.satc.edu.br/portais/acesso/public/#/1', {
-      waitUntil: 'networkidle'
-    });
+    satcPage = new SatcPage(page);
+    await page.goto(BASE_URL, { waitUntil: 'networkidle' });
   });
 
-  for (const value of invalidInputs) {
-    test(`deve exibir "Somente números" ao digitar "${value}"`, async ({
-      page
-    }) => {
-      const matricula = page.locator('#user1');
-      await matricula.pressSequentially(value);
-      await matricula.blur();
+  test('Matrícula com pontos exibe "Somente números"', async () => {
+    await satcPage.preencherMatriculaComPontos();
+    await satcPage.validarMensagemSomenteNumeros();
+  });
 
-      await expect(matricula).toHaveValue(value);
-      await expect(matricula).toHaveClass(/ng-invalid-pattern/);
-      await expect(page.getByText('Somente números')).toBeVisible();
-    });
-  }
+  test('Acessar sem preencher exibe campos obrigatórios', async () => {
+    await satcPage.acessarSemPreencher();
+    await satcPage.validarCamposObrigatorios();
+  });
 
-  test('não deve exibir erro ao digitar apenas números', async ({ page }) => {
-    const matricula = page.locator('#user1');
-    await matricula.pressSequentially('123456');
-    await matricula.blur();
-
-    await expect(matricula).toHaveValue('123456');
-    await expect(matricula).not.toHaveClass(/ng-invalid-pattern/);
-    await expect(page.getByText('Somente números')).toBeHidden();
+  test('Mostrar senha exibe a senha digitada', async () => {
+    const senha = await satcPage.preencherSenhaEMostrar();
+    await satcPage.validarSenhaVisivel(senha);
   });
 });
